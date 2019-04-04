@@ -11,7 +11,15 @@
 #include "substitute-internal.h"
 #include "dyld_cache_format.h"
 
-const struct dyld_all_image_infos *__dyld_get_all_image_infos() {
+const struct dyld_all_image_infos *dyld_get_all_image_infos() {
+    void *lib = dlopen("/usr/lib/system/libdyld.dylib", RTLD_LAZY);
+    if (lib != NULL){
+        struct dyld_all_image_infos *(*weak_dyld_get_all_image_infos)(void) = dlsym(lib, "_dyld_get_all_image_infos");
+        if (weak_dyld_get_all_image_infos != NULL){
+            return weak_dyld_get_all_image_infos();
+        }
+    }
+
     struct task_dyld_info dyld_info;
     mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
     if (task_info(mach_task_self(), TASK_DYLD_INFO, (task_info_t)&dyld_info, &count) == KERN_SUCCESS) {
@@ -20,7 +28,6 @@ const struct dyld_all_image_infos *__dyld_get_all_image_infos() {
         abort();
     }
 }
-const struct dyld_all_image_infos *(*dyld_get_all_image_infos)();
 
 static pthread_once_t dyld_inspect_once = PTHREAD_ONCE_INIT;
 /* and its fruits: */
@@ -321,9 +328,11 @@ EXPORT
 struct substitute_image *substitute_open_image(const char *filename) {
     pthread_once(&dyld_inspect_once, inspect_dyld);
 
+
     void *dlhandle = dlopen(filename, RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
     if (!dlhandle)
         return NULL;
+
 
     void* image = (void*)(((uintptr_t)dlhandle) & (-4));
     unsigned index;
@@ -337,7 +346,7 @@ struct substitute_image *substitute_open_image(const char *filename) {
         image_header = ImageLoaderMegaDylib_getIndexedMachHeader(*dyld_sAllCacheImagesProxy, index);
     } else {
         image_header = ImageLoaderMachO_machHeader(image);
-      slide = ImageLoaderMachO_getSlide(image);
+        slide = ImageLoaderMachO_getSlide(image);
     }
 
     struct substitute_image *im = malloc(sizeof(*im));
@@ -362,17 +371,5 @@ int substitute_find_private_syms(struct substitute_image *im,
                                  size_t nsyms) {
     find_syms_raw(im->image_header, &im->slide, names, syms, nsyms);
     return SUBSTITUTE_OK;
-}
-
-
-__attribute__((constructor))
-void init(void) {
-    void *lib = dlopen("/usr/lib/system/libdyld.dylib", RTLD_LAZY);
-    if (lib != NULL)
-        dyld_get_all_image_infos = dlsym(lib, "_dyld_get_all_image_infos");
-
-    if (dyld_get_all_image_infos == NULL) {
-        dyld_get_all_image_infos = __dyld_get_all_image_infos;
-    }
 }
 #endif /* __APPLE__ */
