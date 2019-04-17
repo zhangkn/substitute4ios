@@ -6,6 +6,7 @@
 #include "execmem.h"
 #include stringify(TARGET_DIR/jump-patch.h)
 #include <pthread.h>
+#include "ptrauth_helpers.h"
 
 struct hook_internal {
     int offset_by_pcdiff[MAX_EXTENDED_PATCH_SIZE + 1];
@@ -162,7 +163,7 @@ int substitute_hook_functions(const struct substitute_function_hook *hooks,
     for (size_t i = 0; i < nhooks; i++) {
         const struct substitute_function_hook *hook = &hooks[i];
         struct hook_internal *hi = &his[i];
-        void *code = hook->function;
+        void *code = make_sym_readable(hook->function);
         struct arch_dis_ctx arch;
         arch_dis_ctx_init(&arch);
 #ifdef __arm__
@@ -174,11 +175,12 @@ int substitute_hook_functions(const struct substitute_function_hook *hooks,
         hi->code = code;
         hi->arch_dis_ctx = arch;
         uintptr_t pc_patch_start = (uintptr_t) code;
+        uintptr_t replacement_dat = (uintptr_t) make_sym_readable(hook->replacement);
         int patch_size;
         bool need_intro_trampoline;
         if ((ret = check_intro_trampoline(&trampoline_ptr, &trampoline_size_left,
                                           pc_patch_start,
-                                          (uintptr_t) hook->replacement,
+                                          replacement_dat,
                                           &patch_size, &need_intro_trampoline,
                                           &hi->trampoline_page, arch)))
             goto end;
@@ -188,9 +190,9 @@ int substitute_hook_functions(const struct substitute_function_hook *hooks,
         if (need_intro_trampoline) {
             initial_target = (uintptr_t) trampoline_ptr;
             make_jump_patch(&trampoline_ptr, (uintptr_t) trampoline_ptr,
-                            (uintptr_t) hook->replacement, arch);
+                            replacement_dat, arch);
         } else {
-            initial_target = (uintptr_t) hook->replacement;
+            initial_target = replacement_dat;
         }
 
         /* Make the real jump patch for the target function. */
@@ -215,7 +217,7 @@ int substitute_hook_functions(const struct substitute_function_hook *hooks,
             hi->outro_trampoline++;
 #endif
         if (hook->old_ptr)
-            *(void **) hook->old_ptr = hi->outro_trampoline;
+            *(void **) hook->old_ptr = make_sym_callable(hi->outro_trampoline);
 
         /* Generate the rewritten start of the function for the outro
          * trampoline (complaining if any bad instructions are found)

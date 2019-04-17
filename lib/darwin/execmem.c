@@ -8,6 +8,7 @@
 #include "darwin/mach-decls.h"
 #include "substitute.h"
 #include "substitute-internal.h"
+#include "ptrauth_helpers.h"
 #include <mach/mach.h>
 #ifndef __MigPackStructs
 #error wtf
@@ -110,7 +111,10 @@ static bool apply_one_pcp_with_state(native_thread_state *state,
     pcp = (uintptr_t *) &state->__eip;
 #elif defined(__arm__) || defined(__arm64__)
 #if __DARWIN_OPAQUE_ARM_THREAD_STATE64
-    pcp = (uintptr_t *) &state->__opaque_pc;
+    uintptr_t unauth_pc;
+    // ????
+    unauth_pc = __darwin_arm_thread_state64_get_pc(*state);
+    pcp = &unauth_pc;
 #else
     pcp = (uintptr_t *) &state->__pc;
 #endif
@@ -127,6 +131,11 @@ static bool apply_one_pcp_with_state(native_thread_state *state,
 #ifdef __arm__
     *pcp &= ~1;
     state->__cpsr = (state->__cpsr & ~0x20) | ((new & 1) * 0x20);
+#endif
+#if __DARWIN_OPAQUE_ARM_THREAD_STATE64
+    // Sign it ourselves, then have it be resigned by the macro.
+    // Waste of cycles, but it's the proper way to do it.
+    __darwin_arm_thread_state64_set_pc_fptr(*state, make_sym_callable((void *)unauth_pc));
 #endif
     return changed;
 }

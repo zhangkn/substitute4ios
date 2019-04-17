@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <limits.h>
 #include <fcntl.h>
+#include "ptrauth_helpers.h"
 
 #include "substitute.h"
 #include "substitute-internal.h"
@@ -320,12 +321,12 @@ static void inspect_dyld() {
     find_syms_raw(dyld_hdr, &dyld_slide, names, syms, 6);
     if (!syms[0] || !syms[1])
         substitute_panic("couldn't find ImageLoader methods\n");
-    ImageLoaderMachO_getSlide = syms[0];
-    ImageLoaderMachO_machHeader = syms[1];
+    ImageLoaderMachO_getSlide = make_sym_callable(syms[0]);
+    ImageLoaderMachO_machHeader = make_sym_callable(syms[1]);
     dyld_sAllCacheImagesProxy = syms[2];
-    ImageLoaderMegaDylib_isCacheHandle = syms[3];
-    ImageLoaderMegaDylib_getSlide = syms[4];
-    ImageLoaderMegaDylib_getIndexedMachHeader = syms[5];
+    ImageLoaderMegaDylib_isCacheHandle = make_sym_callable(syms[3]);
+    ImageLoaderMegaDylib_getSlide = make_sym_callable(syms[4]);
+    ImageLoaderMegaDylib_getIndexedMachHeader = make_sym_callable(syms[5]);
 
     isUsingDyld3 = false;
 
@@ -351,7 +352,7 @@ static void inspect_dyld() {
     if (libdyld_syms[0]){
         isUsingDyld3 = *(bool *)(libdyld_syms[0]);
 
-        dyld3_MachOLoaded_getSlide = libdyld_syms[1];
+        dyld3_MachOLoaded_getSlide = make_sym_callable(libdyld_syms[1]);
     }
 }
 
