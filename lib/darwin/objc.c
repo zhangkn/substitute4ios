@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <sys/queue.h>
 #include <errno.h>
+#include <ptrauth_helpers.h>
 
 /* These trampolines will call e->func(e->arg1, e->arg2), and jump to there,
  * preserving all arguments.  imp_implementationWithBlock would be easier and
@@ -172,16 +173,17 @@ int substitute_hook_objc_message(Class class, SEL selector, void *replacement,
     if (old_ptr) {
         if ((ret = get_trampoline(dereference, old_ptr, NULL, &temp)))
             return ret;
-        *(IMP *) old_ptr = temp;
+        *(void **) old_ptr = make_sym_callable(temp);
     }
 
-    IMP old = class_replaceMethod(class, selector, replacement, types);
+    IMP old = class_replaceMethod(class, selector, make_sym_callable(replacement), types);
     if (old) {
         if (old_ptr)
             *(IMP *) old_ptr = old;
     } else {
         if (old_ptr) {
             Class super = class_getSuperclass(class);
+            void *super_imp = class_getMethodImplementation(super, selector);
             if (!super) {
                 /* this ought to only be possible if the method was removed in
                  * the meantime, since we found the method above and it
@@ -190,8 +192,10 @@ int substitute_hook_objc_message(Class class, SEL selector, void *replacement,
                 substitute_panic("%s: no superclass but the method didn't exist\n",
                                  __func__);
             }
+            void *unsigned_ptr = 0;
             ret = get_trampoline(class_getMethodImplementation, super,
-                                 selector, old_ptr);
+                                 selector, &unsigned_ptr);
+            *(void **)old_ptr = make_sym_callable(unsigned_ptr);
             if (created_imp_ptr)
                 *created_imp_ptr = true;
         }

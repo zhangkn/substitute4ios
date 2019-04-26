@@ -55,7 +55,11 @@ _remap_start:
     ldr x0, my_rpe+8
     ldr x1, my_rpe+0x10
     ldr x2, my_rpe
-    blr x2
+#if defined(__arm64e__)
+    blraaz x2
+#else
+    br x2
+#endif
     mov x9, x0
 
     ldp x1, x0, [sp], #0x10
@@ -64,7 +68,11 @@ _remap_start:
     ldp x7, x6, [sp], #0x10
     ldp x30, x8, [sp], #0x10
 
+#if defined(__arm64e__)
+    braaz x9
+#else
     br x9
+#endif
 #else
 #error No forwarding assembly definition for this arch
 #endif
