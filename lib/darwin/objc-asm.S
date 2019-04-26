@@ -58,7 +58,7 @@ _remap_start:
 #if defined(__arm64e__)
     blraaz x2
 #else
-    br x2
+    blr x2
 #endif
     mov x9, x0
 

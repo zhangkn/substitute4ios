@@ -183,7 +183,6 @@ int substitute_hook_objc_message(Class class, SEL selector, void *replacement,
     } else {
         if (old_ptr) {
             Class super = class_getSuperclass(class);
-            void *super_imp = class_getMethodImplementation(super, selector);
             if (!super) {
                 /* this ought to only be possible if the method was removed in
                  * the meantime, since we found the method above and it
