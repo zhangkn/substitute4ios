@@ -207,7 +207,11 @@
             }
         }
         case 9: {
+#ifdef __arm64e__
+            if ((op & 0xfffffc1f) == 0xd65f0000 || (op & 0xfffffbff) == 0xd65f0bff) {
+#else
             if ((op & 0xfffffc1f) == 0xd65f0000) {
+#endif
                 goto insn_GPR64_Rn_2_BLR; /* 0xd65f0000 | 0x000003e0 */
             } else {
                 return P(unidentified)(ctx);
