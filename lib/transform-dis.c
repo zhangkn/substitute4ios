@@ -78,7 +78,7 @@ static void transform_dis_branch_top(struct transform_dis_ctx *ctx,
     }
     if (cc & CC_CALL) {
         transform_dis_indirect_call(ctx);
-    } else {
+    } else if (!(cc & CC_CONDITIONAL)) {
         transform_dis_ret(ctx);
     }
 }
