@@ -2,9 +2,10 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <os/log.h>
 
 #define substitute_panic(...) do { \
-    fprintf(stderr, __VA_ARGS__); \
+    os_log_error(OS_LOG_DEFAULT, __VA_ARGS__); \
     abort(); \
     __builtin_unreachable(); \
 } while(0)
